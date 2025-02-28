@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "436266852564",
+    "project_id": "database-avachive",
+    "storage_bucket": "database-avachive.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:436266852564:android:c388036f6ece3f86525b41",
+        "android_client_info": {
+          "package_name": "com.example.avachive"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBn5k4Fporm1Du-_FbMKtfl_lElF5R5q1s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
