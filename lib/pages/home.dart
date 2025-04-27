@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'login.dart';
+import 'login_kasir.dart'; // Import halaman login kasir
+import 'login_admin.dart'; // Import halaman login admin
+import 'login_driver.dart'; // Import halaman login driver
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -50,7 +52,7 @@ class HomePage extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const LoginPage(role: 'kasir'), // Mengirimkan role kasir
+                        builder: (context) => const LoginKasirPage(), // Navigasi ke halaman login kasir
                       ),
                     );
                   },
@@ -66,7 +68,7 @@ class HomePage extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const LoginPage(role: 'admin'), // Mengirimkan role admin
+                        builder: (context) => const LoginAdminPage(), // Navigasi ke halaman login admin
                       ),
                     );
                   },
@@ -75,6 +77,22 @@ class HomePage extends StatelessWidget {
                     minimumSize: const Size(double.infinity, 45),
                   ),
                   child: const Text('Login sebagai Admin', style: TextStyle(color: Colors.white)),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginDriverPage(), // Navigasi ke halaman login driver
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    minimumSize: const Size(double.infinity, 45),
+                  ),
+                  child: const Text('Login sebagai Driver', style: TextStyle(color: Colors.white)),
                 ),
               ],
             ),

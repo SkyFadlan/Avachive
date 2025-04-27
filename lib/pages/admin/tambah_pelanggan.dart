@@ -2,18 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 
-class TambahPelangganPage extends StatefulWidget {
+class TambahAdminPelangganPage extends StatefulWidget {
   final String? pelangganId;
   final Map<String, dynamic>? initialData;
 
-  const TambahPelangganPage({Key? key, this.pelangganId, this.initialData})
+  const TambahAdminPelangganPage({Key? key, this.pelangganId, this.initialData})
       : super(key: key);
 
   @override
-  _TambahPelangganPageState createState() => _TambahPelangganPageState();
+  _TambahAdminPelangganPageState createState() =>
+      _TambahAdminPelangganPageState();
 }
 
-class _TambahPelangganPageState extends State<TambahPelangganPage> {
+class _TambahAdminPelangganPageState extends State<TambahAdminPelangganPage> {
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _namaController = TextEditingController();

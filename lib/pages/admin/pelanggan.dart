@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard.dart';
-import 'buat_order.dart';
-import 'data_order.dart';
+import 'karyawan.dart';
+import 'layanan.dart';
 import 'tambah_pelanggan.dart';
-import 'pengaturan.dart'; // Import halaman Pengaturan
+import 'pengaturan.dart';
 import 'detail_pelanggan.dart';
+import 'laporan_bulanan.dart';
 
-class PelangganPage extends StatefulWidget {
-  const PelangganPage({super.key});
+class AdminPelangganPage extends StatefulWidget {
+  const AdminPelangganPage({super.key});
 
   @override
-  State<PelangganPage> createState() => _PelangganPageState();
+  State<AdminPelangganPage> createState() => _AdminPelangganPageState();
 }
 
-class _PelangganPageState extends State<PelangganPage> {
-  int _selectedIndex = 1;
+class _AdminPelangganPageState extends State<AdminPelangganPage> {
+  int _selectedIndex = 3;
   final TextEditingController _searchController = TextEditingController();
 
   void _onItemTapped(int index) {
@@ -24,22 +25,25 @@ class _PelangganPageState extends State<PelangganPage> {
     Widget nextPage;
     switch (index) {
       case 0:
-        nextPage = const DashboardPage();
+        nextPage = const AdminDashboardPage();
         break;
       case 1:
-        nextPage = const PelangganPage();
+        nextPage = const KasirPage();
         break;
       case 2:
-        nextPage = const BuatOrderPage();
+        nextPage = const LayananPage();
         break;
       case 3:
-        nextPage = const DataOrderPage();
+        nextPage = const AdminPelangganPage();
         break;
       case 4:
-        nextPage = const PengaturanPage(); // Navigasi ke halaman Pengaturan
+        nextPage = const LaporanBulananPage();
+        break;
+      case 5:
+        nextPage = const PengaturanAdminPage();
         break;
       default:
-        nextPage = const PelangganPage();
+        nextPage = const AdminPelangganPage();
         break;
     }
 
@@ -69,7 +73,7 @@ class _PelangganPageState extends State<PelangganPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => TambahPelangganPage(
+        builder: (context) => TambahAdminPelangganPage(
           pelangganId: pelangganId,
           initialData: data,
         ),
@@ -213,7 +217,7 @@ class _PelangganPageState extends State<PelangganPage> {
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) =>
-                                          DetailPelangganPage(
+                                          DetailAdminPelangganPage(
                                         namaPelanggan: data['namaPelanggan'] ??
                                             'Nama tidak tersedia',
                                         noHandphone: data['noHandphone'] ??
@@ -251,7 +255,7 @@ class _PelangganPageState extends State<PelangganPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => const TambahPelangganPage()),
+                      builder: (context) => const TambahAdminPelangganPage()),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -274,37 +278,36 @@ class _PelangganPageState extends State<PelangganPage> {
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person,
+            icon: Icon(Icons.people,
                 color: _selectedIndex == 1 ? Colors.blue : Colors.grey),
+            label: 'Karyawan',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.local_laundry_service,
+                color: _selectedIndex == 2 ? Colors.blue : Colors.grey),
+            label: 'Layanan',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people,
+                color: _selectedIndex == 3 ? Colors.blue : Colors.grey),
             label: 'Pelanggan',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart,
-                color: _selectedIndex == 2 ? Colors.blue : Colors.grey),
-            label: 'Buat Order',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.checklist,
-                color: _selectedIndex == 3 ? Colors.blue : Colors.grey),
-            label: 'Data Order',
+            icon: Icon(Icons.bar_chart,
+                color: _selectedIndex == 4 ? Colors.blue : Colors.grey),
+            label: 'Data',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings,
-                color: _selectedIndex == 4 ? Colors.blue : Colors.grey),
+                color: _selectedIndex == 5 ? Colors.blue : Colors.grey),
             label: 'Pengaturan',
           ),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: Colors.blue,
         unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.white,
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
-        iconSize: 20, // Ukuran ikon yang lebih kecil
-        selectedLabelStyle:
-            TextStyle(fontSize: 12), // Ukuran label yang lebih kecil
-        unselectedLabelStyle:
-            TextStyle(fontSize: 12), // Ukuran label yang lebih kecil
         onTap: _onItemTapped,
       ),
     );

@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'admin/kasir.dart'; // Ganti dengan import halaman Kasir yang sesuai
+import 'admin/karyawan.dart'; // Ganti dengan import halaman Kasir yang sesuai
 import 'home.dart'; // Tambahkan import home.dart
 
-class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+class RegisterAdminPage extends StatefulWidget {
+  const RegisterAdminPage({super.key});
 
   @override
-  State<RegisterPage> createState() => _RegisterPageState();
+  State<RegisterAdminPage> createState() => _RegisterAdminPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
+class _RegisterAdminPageState extends State<RegisterAdminPage> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -46,7 +46,7 @@ class _RegisterPageState extends State<RegisterPage> {
           .set({
         'username': _usernameController.text.trim(),
         'email': _emailController.text.trim(),
-        'role': 'kasir', // Atur role sesuai kebutuhan
+        'role': 'Admin', // Atur role sesuai kebutuhan
       });
 
       ScaffoldMessenger.of(context).showSnackBar(

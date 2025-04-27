@@ -6,6 +6,9 @@ import 'pages/login.dart'; // Pastikan import ini ada
 import 'pages/dashboard.dart'; // Halaman Dashboard untuk Kasir
 import 'pages/admin/dashboard.dart'; // Halaman Dashboard untuk Admin
 import 'pages/home.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'pages/driver/dashboard.dart';
+
 
 void main() async {
   // Pastikan widget binding sudah diinisialisasi
@@ -13,7 +16,7 @@ void main() async {
   
   // Inisialisasi Firebase
   await Firebase.initializeApp();
-
+  await initializeDateFormatting('id_ID', null);
   runApp(const MyApp());
 }
 
@@ -59,6 +62,8 @@ class AuthChecker extends StatelessWidget {
                   return const AdminDashboardPage(); // Halaman Dashboard Admin
                 } else if (role == 'kasir') {
                   return const DashboardPage(); // Halaman Dashboard Kasir
+                } else if (role == 'driver') {
+                  return const DashboardDriverPage();
                 }
               }
 

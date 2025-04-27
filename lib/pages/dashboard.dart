@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
 import 'pelanggan.dart';
 import 'buat_order.dart';
 import 'data_order.dart';
-import 'layanan.dart'; // Tambahkan import untuk halaman layanan
-import 'pengaturan.dart'; // Import halaman Pengaturan
+import 'layanan.dart';
+import 'pengaturan.dart';
+import 'package:intl/intl.dart'; // Import untuk format tanggal
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -14,14 +17,116 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
+  int _jumlahPelanggan = 0;
+  int _jumlahLayanan = 0;
+  int _pendapatanHariIni = 0;
+  int _orderHariIni = 0;
+  bool _hasNewService = false; // Status untuk layanan baru
 
-  final List<Widget> _pages = [
-    const DashboardPage(),
-    const PelangganPage(),
-    const BuatOrderPage(),
-    const DataOrderPage(),
-    const PengaturanPage(), // Tambahkan halaman Pengaturan
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _getJumlahPelanggan();
+    _getJumlahLayanan();
+    _getPendapatanDanOrderHariIni();
+    _checkForNewService(); // Cek status layanan baru
+  }
+
+  String formatCurrency(int amount) {
+    final formatter =
+        NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
+    return formatter.format(amount);
+  }
+
+  void _getJumlahPelanggan() async {
+    try {
+      QuerySnapshot snapshot =
+          await FirebaseFirestore.instance.collection('Pelanggan').get();
+      setState(() {
+        _jumlahPelanggan = snapshot.docs.length;
+      });
+    } catch (e) {
+      print('Gagal mengambil jumlah pelanggan: $e');
+    }
+  }
+
+  void _getJumlahLayanan() async {
+    try {
+      QuerySnapshot snapshot =
+          await FirebaseFirestore.instance.collection('Layanan').get();
+      setState(() {
+        _jumlahLayanan = snapshot.docs.length;
+      });
+
+      // Cek apakah ada layanan baru ditambahkan dalam 24 jam terakhir
+      DateTime now = DateTime.now();
+      bool hasNewService = false;
+
+      for (var doc in snapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        var createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+        if (createdAt != null && now.difference(createdAt).inHours < 24) {
+          hasNewService = true;
+          break;
+        }
+      }
+
+      // Simpan status layanan baru di SharedPreferences
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('hasNewService', hasNewService);
+      setState(() {
+        _hasNewService = hasNewService;
+      });
+    } catch (e) {
+      print('Gagal mengambil jumlah layanan: $e');
+    }
+  }
+
+  void _getPendapatanDanOrderHariIni() async {
+    try {
+      DateTime today = DateTime.now();
+      String todayString =
+          DateFormat('yyyy-MM-dd').format(today); // Format YYYY-MM-DD
+
+      QuerySnapshot snapshot = await FirebaseFirestore.instance
+          .collection('orderan')
+          .where('timestamp',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(
+                  DateTime(today.year, today.month, today.day)))
+          .where('timestamp',
+              isLessThan: Timestamp.fromDate(
+                  DateTime(today.year, today.month, today.day + 1)))
+          .get();
+
+      int totalPendapatan = 0;
+      int totalOrder = snapshot.docs.length;
+
+      for (var doc in snapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        if (data['total_price'] != null) {
+          totalPendapatan += (data['total_price'] as num).toInt();
+        }
+      }
+
+      setState(() {
+        _pendapatanHariIni = totalPendapatan;
+        _orderHariIni = totalOrder;
+      });
+
+      print('Pendapatan Hari Ini: ${formatCurrency(_pendapatanHariIni)}');
+      print('Order Hari Ini: $_orderHariIni');
+    } catch (e) {
+      print('Gagal mengambil pendapatan dan order hari ini: $e');
+    }
+  }
+
+  void _checkForNewService() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _hasNewService =
+          prefs.getBool('hasNewService') ?? false; // Cek status layanan baru
+    });
+  }
 
   void _onItemTapped(int index) {
     if (_selectedIndex != index) {
@@ -35,6 +140,14 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  final List<Widget> _pages = [
+    const DashboardPage(),
+    const PelangganPage(),
+    const BuatOrderPage(),
+    const DataOrderPage(),
+    const PengaturanPage(),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,7 +158,6 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         backgroundColor: Colors.blue,
         automaticallyImplyLeading: false,
-        // Hapus bagian actions untuk menghilangkan ikon pengaturan
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -75,8 +187,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         Column(
-                          children: const [
-                            Text(
+                          children: [
+                            const Text(
                               'Pendapatan Hari Ini',
                               style: TextStyle(
                                 fontSize: 16,
@@ -84,10 +196,10 @@ class _DashboardPageState extends State<DashboardPage> {
                                 color: Colors.lightBlue,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
-                              'Rp 40.000',
-                              style: TextStyle(
+                              formatCurrency(_pendapatanHariIni),
+                              style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -100,8 +212,8 @@ class _DashboardPageState extends State<DashboardPage> {
                           color: Colors.grey,
                         ),
                         Column(
-                          children: const [
-                            Text(
+                          children: [
+                            const Text(
                               'Order Hari Ini',
                               style: TextStyle(
                                 fontSize: 16,
@@ -109,10 +221,10 @@ class _DashboardPageState extends State<DashboardPage> {
                                 color: Colors.lightBlue,
                               ),
                             ),
-                            SizedBox(height: 8),
+                            const SizedBox(height: 8),
                             Text(
-                              '2',
-                              style: TextStyle(
+                              '$_orderHariIni',
+                              style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -148,7 +260,14 @@ class _DashboardPageState extends State<DashboardPage> {
                           children: [
                             IconButton(
                               onPressed: () {
-                                // Navigasi ke halaman Layanan
+                                // Hapus status layanan baru
+                                SharedPreferences.getInstance().then((prefs) {
+                                  prefs.setBool('hasNewService', false);
+                                  setState(() {
+                                    _hasNewService = false; // Update state
+                                  });
+                                });
+
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -156,29 +275,62 @@ class _DashboardPageState extends State<DashboardPage> {
                                   ),
                                 );
                               },
-                              icon: const Icon(Icons.shopping_bag),
+                              icon: Stack(
+                                children: [
+                                  const Icon(Icons.shopping_bag),
+                                  if (_hasNewService)
+                                    Positioned(
+                                      right: 0,
+                                      top: 0,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        child: const Text(
+                                          'New',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                               color: Colors.blue,
                               iconSize: 40,
                             ),
                             const Text('Layanan'),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Jumlah: $_jumlahLayanan',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                         Column(
                           children: [
                             IconButton(
                               onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const PelangganPage(),
-                                  ),
-                                );
+                                // Tindakan jika ingin menampilkan daftar pelanggan
                               },
                               icon: const Icon(Icons.people),
                               color: Colors.blue,
                               iconSize: 40,
                             ),
                             const Text('Pelanggan'),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Jumlah: $_jumlahPelanggan',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                         Column(
@@ -242,11 +394,9 @@ class _DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.white,
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
-        iconSize: 20, // Ukuran ikon yang lebih kecil
-        selectedLabelStyle:
-            TextStyle(fontSize: 12), // Ukuran label yang lebih kecil
-        unselectedLabelStyle:
-            TextStyle(fontSize: 12), // Ukuran label yang lebih kecil
+        iconSize: 20,
+        selectedLabelStyle: TextStyle(fontSize: 12),
+        unselectedLabelStyle: TextStyle(fontSize: 12),
         onTap: _onItemTapped,
       ),
     );

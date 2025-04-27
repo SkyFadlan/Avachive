@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dashboard.dart'; // Ganti dengan import halaman Dashboard Admin yang sesuai
-import 'kasir.dart'; // Ganti dengan import halaman Kasir yang sesuai
-import 'laporan_bulanan.dart'; // Ganti dengan import halaman Laporan Bulanan yang sesuai
-import 'pengaturan.dart'; // Ganti dengan import halaman Pengaturan yang sesuai
+import 'dashboard.dart';
+import 'karyawan.dart';
+import 'pelanggan.dart';
+import 'pengaturan.dart';
+import 'tambah_layanan.dart';
+import 'edit_layanan.dart';
+import 'laporan_bulanan.dart'; // Import halaman edit layanan
+import 'package:intl/intl.dart';
 
 class LayananPage extends StatefulWidget {
   const LayananPage({super.key});
@@ -13,7 +17,24 @@ class LayananPage extends StatefulWidget {
 }
 
 class _LayananPageState extends State<LayananPage> {
-  int _selectedIndex = 2; // Indeks untuk Layanan
+  int _selectedIndex = 2;
+
+  // Fungsi untuk menghapus layanan
+  Future<void> _hapusLayanan(String docId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('Layanan')
+          .doc(docId)
+          .delete();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Layanan berhasil dihapus!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus: ${e.toString()}')),
+      );
+    }
+  }
 
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return;
@@ -21,22 +42,25 @@ class _LayananPageState extends State<LayananPage> {
     Widget nextPage;
     switch (index) {
       case 0:
-        nextPage = const AdminDashboardPage(); // Halaman Dashboard Admin
+        nextPage = const AdminDashboardPage();
         break;
       case 1:
-        nextPage = const KasirPage(); // Halaman Kasir
+        nextPage = const KasirPage();
         break;
       case 2:
-        nextPage = const LayananPage(); // Halaman Layanan
+        nextPage = const LayananPage();
         break;
       case 3:
-        nextPage = const LaporanBulananPage(); // Halaman Laporan Bulanan
+        nextPage = const AdminPelangganPage();
         break;
       case 4:
-        nextPage = const PengaturanAdminPage(); // Halaman Pengaturan
+        nextPage = const LaporanBulananPage();
+        break;
+      case 5:
+        nextPage = const PengaturanAdminPage();
         break;
       default:
-        nextPage = const LayananPage(); // Halaman Layanan
+        nextPage = const LayananPage();
         break;
     }
 
@@ -46,11 +70,18 @@ class _LayananPageState extends State<LayananPage> {
     );
   }
 
+  String formatCurrency(int amount) {
+    final formatter =
+        NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
+    return formatter.format(amount);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daftar Layanan', style: TextStyle(color: Colors.white)),
+        title:
+            const Text('Daftar Layanan', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blue,
         automaticallyImplyLeading: false,
       ),
@@ -73,17 +104,69 @@ class _LayananPageState extends State<LayananPage> {
               itemCount: layananList.length,
               itemBuilder: (context, index) {
                 var data = layananList[index].data() as Map<String, dynamic>;
+                String docId = layananList[index].id;
 
                 return Card(
                   color: Colors.grey[300],
                   child: ListTile(
-                    leading: Icon(Icons.cleaning_services, color: Colors.blue),
+                    leading: const Icon(Icons.local_laundry_service,
+                        color: Colors.blue),
                     title: Text(
                       data['namaLayanan'] ?? 'Nama tidak tersedia',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                      "Harga: Rp ${data['Harga'] ?? '0'} | Kategori: ${data['Kategori'] ?? '-'}",
+                      "Harga: ${formatCurrency(data['Harga'] ?? 0)}  Paket: ${data['Paket'] ?? '-'}  Kategori: ${data['Kategori'] ?? '-'}",
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Tombol Edit
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditLayananPage(
+                                  docId: docId,
+                                  currentData: data,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        // Tombol Hapus
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title: const Text('Konfirmasi'),
+                                  content: const Text(
+                                      'Yakin ingin menghapus layanan ini?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Batal'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        _hapusLayanan(docId);
+                                      },
+                                      child: const Text('Hapus',
+                                          style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -92,26 +175,46 @@ class _LayananPageState extends State<LayananPage> {
           },
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const TambahLayananPage()),
+          );
+        },
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home, color: _selectedIndex == 0 ? Colors.blue : Colors.grey),
+            icon: Icon(Icons.home,
+                color: _selectedIndex == 0 ? Colors.blue : Colors.grey),
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.people, color: _selectedIndex == 1 ? Colors.blue : Colors.grey),
-            label: 'Kasir',
+            icon: Icon(Icons.people,
+                color: _selectedIndex == 1 ? Colors.blue : Colors.grey),
+            label: 'Karyawan',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.local_laundry_service, color: _selectedIndex == 2 ? Colors.blue : Colors.grey),
+            icon: Icon(Icons.local_laundry_service,
+                color: _selectedIndex == 2 ? Colors.blue : Colors.grey),
             label: 'Layanan',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart, color: _selectedIndex == 3 ? Colors.blue : Colors.grey),
-            label: 'Laporan Bulanan',
+            icon: Icon(Icons.people,
+                color: _selectedIndex == 3 ? Colors.blue : Colors.grey),
+            label: 'Pelanggan',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings, color: _selectedIndex == 4 ? Colors.blue : Colors.grey),
+            icon: Icon(Icons.bar_chart,
+                color: _selectedIndex == 3 ? Colors.blue : Colors.grey),
+            label: 'Data',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings,
+                color: _selectedIndex == 4 ? Colors.blue : Colors.grey),
             label: 'Pengaturan',
           ),
         ],

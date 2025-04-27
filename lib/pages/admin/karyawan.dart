@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard.dart'; // Ganti dengan import halaman Dashboard Admin yang sesuai
 import 'layanan.dart'; // Ganti dengan import halaman Layanan yang sesuai
-import 'laporan_bulanan.dart'; // Ganti dengan import halaman Laporan Bulanan yang sesuai
+import 'pelanggan.dart'; // Ganti dengan import halaman Pelanggan yang sesuai
 import 'pengaturan.dart'; // Ganti dengan import halaman Pengaturan yang sesuai
-import '../register.dart'; // Ganti dengan import halaman Register yang sesuai
+import 'register.dart'; // Ganti dengan import halaman Register yang sesuai
+import 'laporan_bulanan.dart'; // Ganti dengan import halaman Laporan Bulanan yang sesuai
 
 class KasirPage extends StatefulWidget {
   const KasirPage({super.key});
@@ -31,9 +32,12 @@ class _KasirPageState extends State<KasirPage> {
         nextPage = const LayananPage(); // Halaman Layanan
         break;
       case 3:
-        nextPage = const LaporanBulananPage(); // Halaman Laporan Bulanan
+        nextPage = const AdminPelangganPage(); // Halaman Pelanggan
         break;
       case 4:
+        nextPage = const LaporanBulananPage(); // Halaman Laporan Bulanan
+        break;
+      case 5:
         nextPage = const PengaturanAdminPage(); // Halaman Pengaturan
         break;
       default:
@@ -51,7 +55,7 @@ class _KasirPageState extends State<KasirPage> {
     try {
       await FirebaseFirestore.instance.collection('Users').doc(uid).delete();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kasir berhasil dihapus')),
+        const SnackBar(content: Text('Karyawan berhasil dihapus')),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -64,28 +68,16 @@ class _KasirPageState extends State<KasirPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daftar Kasir', style: TextStyle(color: Colors.white)),
+        title: const Text('Daftar Karyawan', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blue,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              // Navigasi ke halaman register
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const RegisterPage()), // Ganti dengan halaman Register
-              );
-            },
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: StreamBuilder(
+        child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('Users')
-              .where('role', isEqualTo: 'kasir')
+              .where('role', whereIn: ['kasir', 'driver']) // Filter berdasarkan role kasir dan driver
               .snapshots(),
           builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -93,7 +85,7 @@ class _KasirPageState extends State<KasirPage> {
             }
 
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return const Center(child: Text('Tidak ada kasir terdaftar.'));
+              return const Center(child: Text('Tidak ada karyawan terdaftar.'));
             }
 
             var kasirList = snapshot.data!.docs;
@@ -107,12 +99,18 @@ class _KasirPageState extends State<KasirPage> {
                 return Card(
                   color: Colors.grey[300],
                   child: ListTile(
-                    leading: Icon(Icons.person, color: Colors.blue),
+                    leading: const Icon(Icons.person, color: Colors.blue),
                     title: Text(
                       data['username'] ?? 'Nama tidak tersedia',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: Text(data['email'] ?? 'Email tidak tersedia'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(data['id_karyawan'] ?? 'ID tidak tersedia'),
+                        Text(data['role'] ?? 'Role tidak tersedia'),
+                      ],
+                    ),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () {
@@ -125,7 +123,7 @@ class _KasirPageState extends State<KasirPage> {
                               content: const Text('Apakah Anda yakin ingin menghapus kasir ini?'),
                               actions: [
                                 TextButton(
-                                  onPressed: () {
+ onPressed: () {
                                     Navigator.of(context).pop(); // Tutup dialog
                                   },
                                   child: const Text('Batal'),
@@ -150,6 +148,16 @@ class _KasirPageState extends State<KasirPage> {
           },
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const RegisterPage()),
+          );
+        },
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         items: [
           BottomNavigationBarItem(
@@ -158,18 +166,22 @@ class _KasirPageState extends State<KasirPage> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.people, color: _selectedIndex == 1 ? Colors.blue : Colors.grey),
-            label: 'Kasir',
+            label: 'Karyawan',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.local_laundry_service, color: _selectedIndex == 2 ? Colors.blue : Colors.grey),
             label: 'Layanan',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart, color: _selectedIndex == 3 ? Colors.blue : Colors.grey),
-            label: 'Laporan Bulanan',
+            icon: Icon(Icons.people, color: _selectedIndex == 3 ? Colors.blue : Colors.grey),
+            label: 'Pelanggan',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings, color: _selectedIndex == 4 ? Colors.blue : Colors.grey),
+            icon: Icon(Icons.bar_chart, color: _selectedIndex == 4 ? Colors.blue : Colors.grey),
+            label: 'Data',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings, color: _selectedIndex == 5 ? Colors.blue : Colors.grey),
             label: 'Pengaturan',
           ),
         ],

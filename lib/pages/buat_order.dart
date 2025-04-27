@@ -4,6 +4,7 @@ import 'dashboard.dart';
 import 'pelanggan.dart';
 import 'data_order.dart';
 import 'pengaturan.dart';
+import 'package:intl/intl.dart';
 
 class BuatOrderPage extends StatefulWidget {
   const BuatOrderPage({super.key});
@@ -22,22 +23,74 @@ class _BuatOrderPageState extends State<BuatOrderPage>
   String? selectedCustomerProvinsi; // Menyimpan provinsi pelanggan
   String? selectedCustomerKota; // Menyimpan kota pelanggan
   String? selectedCustomerKecamatan; // Menyimpan kecamatan pelanggan
+  String? selectedCustomerKodePos;
+  String? selectedCustomerNoRumah;
+  String? selectedCustomerRtRw;
+  String? selectedCustomerDetailAlamat; // Menyimpan detail alamat pelanggan
+  String? selectedCustomerAlamatLengkap;
+  String? selectedWaktuPembayaran;
+  List<String> waktuPembayaranOptions = [
+    "Bayar Sekarang",
+    "Bayar Nanti",
+  ];
   List<Map<String, dynamic>> selectedItems = [];
   int totalHarga = 0;
 
   // Variabel untuk pencarian
   String searchQuery = '';
 
+  int? uangDiberikan; // Menyimpan nominal uang yang diberikan oleh pelanggan
+  int kembalian = 0; // Menyimpan nilai kembalian
+  int? dp; // Menyimpan nominal DP yang diberikan
+  int sisaPembayaran = 0; // Menyimpan sisa pembayaran
+
+  // Variabel untuk metode pembayaran
+  String? selectedPaymentMethod; // Menyimpan metode pembayaran yang dipilih
+  List<String> paymentMethods = []; // Menyimpan daftar metode pembayaran
+
+  // Variabel untuk metode pengambilan
+  String? selectedPickupMethod; // Menyimpan metode pengambilan yang dipilih
+  List<String> pickupMethods = [
+    "Diantar ke Alamat",
+    "Diambil Sendiri"
+  ]; // Daftar metode pengambilan
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 1, vsync: this);
+    _fetchPaymentMethods(); // Mengambil metode pembayaran saat halaman diinisialisasi
+  }
+
+  String formatCurrency(int amount) {
+    final formatter =
+        NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
+    return formatter.format(amount);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  // Mengambil metode pembayaran dari Firestore
+  void _fetchPaymentMethods() async {
+    try {
+      var snapshot =
+          await FirebaseFirestore.instance.collection('Pembayaran').get();
+      setState(() {
+        paymentMethods = snapshot.docs
+            .map((doc) => doc['metodePembayaran'] as String)
+            .toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content:
+                Text("Terjadi kesalahan saat mengambil metode pembayaran: $e")),
+      );
+    }
   }
 
   void _onItemTapped(int index) {
@@ -64,10 +117,8 @@ class _BuatOrderPageState extends State<BuatOrderPage>
             MaterialPageRoute(builder: (context) => const DataOrderPage()));
         break;
       case 4:
-        Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => const PengaturanPage()));
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (context) => const PengaturanPage()));
         break;
     }
   }
@@ -83,7 +134,10 @@ class _BuatOrderPageState extends State<BuatOrderPage>
         var items = snapshot.data!.docs.where((doc) {
           var data = doc.data() as Map<String, dynamic>;
           // Filter berdasarkan pencarian
-          return data["namaLayanan"].toString().toLowerCase().contains(searchQuery.toLowerCase());
+          return data["namaLayanan"]
+              .toString()
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase());
         }).toList();
 
         return ListView.builder(
@@ -97,15 +151,18 @@ class _BuatOrderPageState extends State<BuatOrderPage>
                 children: [
                   Text("Kategori: ${data["Kategori"] ?? ""}"),
                   Text("Paket: ${data["Paket"] ?? ""}"),
-                  Text("Rp ${data["Harga"] ?? "0"}"),
+                  Text(formatCurrency((data["Harga"] as num?)?.toInt() ?? 0)),
                 ],
               ),
               trailing: ElevatedButton(
                 onPressed: () {
                   _tambahItem({
                     "name": data["namaLayanan"] ?? "",
-                    "price": int.tryParse(data["Harga"] ?? "0") ?? 0,
+                    "price": (data["Harga"] as num?)?.toInt() ??
+                        0, // Pastikan ini adalah number
                     "quantity": 1,
+                    "kategori":
+                        data["Kategori"] ?? "", // Menyimpan kategori layanan
                   });
                 },
                 child: const Text("Tambah"),
@@ -138,32 +195,6 @@ class _BuatOrderPageState extends State<BuatOrderPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (selectedCustomer != null) ...[
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              "Pelanggan: $selectedCustomer",
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              "No Handphone: $selectedCustomerPhone",
-              style: const TextStyle(fontSize: 16),
-            ),
-          ),
-          const Divider(),
-        ] else
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton(
-              onPressed: () {
-                _pilihPelanggan();
-              },
-              child: const Text("Pilih Pelanggan"),
-            ),
-          ),
         if (selectedItems.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -176,7 +207,14 @@ class _BuatOrderPageState extends State<BuatOrderPage>
                 margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: ListTile(
                   title: Text(item["name"]),
-                  subtitle: Text("Rp ${item["price"]} x ${item["quantity"]}"),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Kategori: ${item["kategori"]}"),
+                      Text(
+                          "${formatCurrency(item["price"])} x ${item["quantity"]}"),
+                    ],
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -202,15 +240,170 @@ class _BuatOrderPageState extends State<BuatOrderPage>
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: Text(
-            "Total Harga: Rp $totalHarga",
+            "Total Harga: ${formatCurrency(totalHarga)}",
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ),
+        // Dropdown untuk memilih waktu pembayaran
+        if (selectedItems.isNotEmpty) _buildWaktuPembayaranDropdown(),
+        // Dropdown untuk memilih metode pengambilan
+        if (selectedItems.isNotEmpty) _buildPickupMethodDropdown(),
         ElevatedButton(
           onPressed: _simpanOrder,
           child: const Text("Simpan Order"),
         ),
       ],
+    );
+  }
+
+  Widget _buildPaymentMethodDropdown() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: DropdownButtonFormField<String>(
+        decoration: InputDecoration(
+          labelText: 'Pilih Metode Pembayaran',
+          border: OutlineInputBorder(),
+        ),
+        value: selectedPaymentMethod,
+        items: paymentMethods.map((method) {
+          return DropdownMenuItem<String>(
+            value: method,
+            child: Text(method),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            selectedPaymentMethod = value;
+            // Reset uangDiberikan saat metode pembayaran berubah
+            uangDiberikan = null;
+            kembalian = 0; // Reset kembalian
+          });
+        },
+        hint: const Text("Pilih Metode Pembayaran"),
+      ),
+    );
+  }
+
+  Widget _buildWaktuPembayaranDropdown() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Waktu Pembayaran',
+              border: OutlineInputBorder(),
+            ),
+            value: selectedWaktuPembayaran,
+            items: waktuPembayaranOptions.map((option) {
+              return DropdownMenuItem<String>(
+                value: option,
+                child: Text(option),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                selectedWaktuPembayaran = value;
+                // Reset uangDiberikan dan kembalian saat waktu pembayaran berubah
+                uangDiberikan = null;
+                kembalian = 0;
+                selectedPaymentMethod = null; // Reset metode pembayaran
+              });
+            },
+            hint: const Text("Pilih Waktu Pembayaran"),
+          ),
+          if (selectedWaktuPembayaran == "Bayar Sekarang") ...[
+            // Tampilkan dropdown metode pembayaran jika waktu pembayaran adalah "Bayar Sekarang"
+            _buildPaymentMethodDropdown(),
+            if (selectedPaymentMethod == "Tunai") ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: TextField(
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Nominal Uang Diberikan',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      uangDiberikan = int.tryParse(value) ?? 0;
+                      kembalian = (uangDiberikan! - totalHarga)
+                          .clamp(0, double.infinity)
+                          .toInt();
+                    });
+                  },
+                ),
+              ),
+              if (uangDiberikan != null) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    "Kembalian: ${formatCurrency(kembalian)}",
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ],
+          ],
+          if (selectedWaktuPembayaran == "Bayar Nanti") ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: TextField(
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Nominal DP',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    dp = int.tryParse(value) ?? 0;
+                    sisaPembayaran = (totalHarga - (dp ?? 0))
+                        .clamp(0, double.infinity)
+                        .toInt();
+                  });
+                },
+              ),
+            ),
+            if (dp != null) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  "Sisa Pembayaran: ${formatCurrency(sisaPembayaran)}",
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPickupMethodDropdown() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: DropdownButtonFormField<String>(
+        decoration: InputDecoration(
+          labelText: 'Pilih Metode Pengambilan',
+          border: OutlineInputBorder(),
+        ),
+        value: selectedPickupMethod,
+        items: pickupMethods.map((method) {
+          return DropdownMenuItem<String>(
+            value: method,
+            child: Text(method),
+          );
+        }).toList(),
+        onChanged: (value) {
+          setState(() {
+            selectedPickupMethod = value;
+          });
+        },
+        hint: const Text("Pilih Metode Pengambilan"),
+      ),
     );
   }
 
@@ -236,8 +429,9 @@ class _BuatOrderPageState extends State<BuatOrderPage>
       } else {
         selectedItems.add({
           "name": item["name"],
-          "price": item["price"],
+          "price": item["price"], // Pastikan ini adalah number
           "quantity": 1,
+          "kategori": item["kategori"], // Menyimpan kategori layanan
         });
       }
       _hitungTotal();
@@ -256,19 +450,56 @@ class _BuatOrderPageState extends State<BuatOrderPage>
   }
 
   void _simpanOrder() {
-    if (selectedCustomer == null || selectedItems.isEmpty) {
+    if (selectedCustomer == null ||
+        selectedItems.isEmpty ||
+        selectedPickupMethod == null ||
+        selectedWaktuPembayaran == null ||
+        (selectedWaktuPembayaran == "Bayar Sekarang" &&
+            selectedPaymentMethod == "Tunai" &&
+            (uangDiberikan == null || uangDiberikan! < totalHarga))) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Harap pilih pelanggan dan layanan")),
+        const SnackBar(
+            content: Text(
+                "Harap pilih pelanggan, layanan, metode pembayaran, waktu pembayaran, dan metode pengambilan, serta pastikan uang yang diberikan cukup")),
       );
       return;
     }
 
     FirebaseFirestore.instance.collection('orderan').add({
-      "customer": selectedCustomer,
-      "items": selectedItems,
+      "customer": {
+        "name": selectedCustomer,
+        "noHandphone": selectedCustomerPhone,
+        "provinsi": selectedCustomerProvinsi,
+        "kota": selectedCustomerKota,
+        "kecamatan": selectedCustomerKecamatan,
+        "kodePos": selectedCustomerKodePos,
+        "rtRw": selectedCustomerRtRw,
+        "noRumah": selectedCustomerNoRumah,
+        "detailAlamat": selectedCustomerDetailAlamat,
+        "alamatLengkap": selectedCustomerAlamatLengkap,
+      },
+      "items": selectedItems.map((item) {
+        return {
+          "name": item["name"],
+          "price": item["price"],
+          "quantity": item["quantity"],
+          "kategori": item["kategori"],
+        };
+      }).toList(),
       "total_price": totalHarga,
+      "metodePembayaran": selectedPaymentMethod,
+      "waktuPembayaran": selectedWaktuPembayaran, // Store payment time
+      "metodePengambilan": selectedPickupMethod,
+      "uangDiberikan": selectedPaymentMethod == "Tunai" ? uangDiberikan : null,
+      "kembalian": selectedPaymentMethod == "Tunai" ? kembalian : null,
+      "dp": selectedWaktuPembayaran == "Bayar Nanti"
+          ? dp
+          : null, // Simpan DP jika bayar nanti
+      "sisaPembayaran": selectedWaktuPembayaran == "Bayar Nanti"
+          ? sisaPembayaran
+          : null, // Simpan sisa pembayaran
       "timestamp": Timestamp.now(),
-      "status": "Diproses", // Pastikan status disimpan sebagai "Diproses"
+      "status": "Diproses",
     }).then((_) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Order berhasil disimpan!")),
@@ -283,7 +514,7 @@ class _BuatOrderPageState extends State<BuatOrderPage>
         }
       });
     }).catchError((error) {
-      ScaffoldMessenger.of(context ).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Terjadi kesalahan: $error")),
       );
     });
@@ -308,6 +539,11 @@ class _BuatOrderPageState extends State<BuatOrderPage>
                 "provinsi": doc.data()["provinsi"] ?? "",
                 "kota": doc.data()["kota"] ?? "",
                 "kecamatan": doc.data()["kecamatan"] ?? "",
+                "kodePos": doc.data()["kodePos"] ?? "",
+                "rtRw": doc.data()["rtRw"] ?? "",
+                "noRumah": doc.data()["noRumah"] ?? "",
+                "detailAlamat": doc.data()["detailAlamat"] ?? "",
+                "alamatLengkap": doc.data()["alamatLengkap"] ?? "",
               })
           .toList();
 
@@ -327,10 +563,22 @@ class _BuatOrderPageState extends State<BuatOrderPage>
                       onTap: () {
                         setState(() {
                           selectedCustomer = pelangganList[index]["nama"];
-                          selectedCustomerPhone = pelangganList[index]["noHandphone"];
-                          selectedCustomerProvinsi = pelangganList[index]["provinsi"];
+                          selectedCustomerPhone =
+                              pelangganList[index]["noHandphone"];
+                          selectedCustomerProvinsi =
+                              pelangganList[index]["provinsi"];
                           selectedCustomerKota = pelangganList[index]["kota"];
-                          selectedCustomerKecamatan = pelangganList[index]["kecamatan"];
+                          selectedCustomerKecamatan =
+                              pelangganList[index]["kecamatan"];
+                          selectedCustomerKodePos =
+                              pelangganList[index]["kodePos"];
+                          selectedCustomerRtRw = pelangganList[index]["rtRw"];
+                          selectedCustomerNoRumah =
+                              pelangganList[index]["noRumah"];
+                          selectedCustomerDetailAlamat =
+                              pelangganList[index]["detailAlamat"];
+                          selectedCustomerAlamatLengkap =
+                              pelangganList[index]["alamatLengkap"];
                         });
                         Navigator.pop(context);
                       },
@@ -360,29 +608,44 @@ class _BuatOrderPageState extends State<BuatOrderPage>
         backgroundColor: Colors.blue,
         automaticallyImplyLeading: false,
       ),
-      body: Column(
-        children: [
-          _buildSearchField(),
-          Expanded(
-            child: _buildItemList('Layanan'),
-          ),
-          if (selectedItems.isNotEmpty && selectedCustomer == null)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: ElevatedButton(
-                onPressed: _pilihPelanggan,
-                child: const Text("Pilih Pelanggan"),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSearchField(),
+            SizedBox(
+              height: 300, // Beri tinggi tetap agar tidak bentrok dengan scroll
+              child: _buildItemList('Layanan'),
+            ),
+            if (selectedCustomer == null && selectedItems.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: ElevatedButton(
+                  onPressed: _pilihPelanggan,
+                  child: const Text("Pilih Pelanggan"),
+                ),
               ),
-            ),
-          if (selectedCustomer != null)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text("Pelanggan: $selectedCustomer",
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-          if (selectedItems.isNotEmpty) _buildSelectedItems(),
-        ],
+            if (selectedCustomer != null)
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Pelanggan: $selectedCustomer",
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: _pilihPelanggan,
+                    ),
+                  ],
+                ),
+              ),
+            if (selectedItems.isNotEmpty) _buildSelectedItems(),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: [
@@ -419,10 +682,8 @@ class _BuatOrderPageState extends State<BuatOrderPage>
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
         iconSize: 20,
-        selectedLabelStyle:
-            const TextStyle(fontSize: 12),
-        unselectedLabelStyle:
-            const TextStyle(fontSize: 12),
+        selectedLabelStyle: const TextStyle(fontSize: 12),
+        unselectedLabelStyle: const TextStyle(fontSize: 12),
         onTap: _onItemTapped,
       ),
     );

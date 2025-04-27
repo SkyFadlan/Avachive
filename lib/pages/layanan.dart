@@ -65,12 +65,23 @@ class _LayananPageState extends State<LayananPage>
             var harga = data['Harga'] ?? '0';
             var kategori = data['Kategori'] ?? 'Tanpa Kategori';
             var paket = data.containsKey('Paket') ? data['Paket'] : 'Tanpa Paket';
+            var createdAt = (data['createdAt'] as Timestamp?)?.toDate(); // Ambil timestamp
+
+            // Cek apakah layanan baru ditambahkan dalam 24 jam terakhir
+            bool isNew = createdAt != null && DateTime.now().difference(createdAt).inHours < 24;
 
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: ListTile(
                 leading: Text("${index + 1}."),
-                title: Text(namaLayanan),
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(namaLayanan),
+                    if (isNew) // Tampilkan ikon "New" jika layanan baru
+                      const Icon(Icons.new_releases, color: Colors.red, size: 20),
+                  ],
+                ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

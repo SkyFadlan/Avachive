@@ -6,14 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
-import 'package:permission_handler/permission_handler.dart';
-
-Future<void> requestStoragePermission() async {
-  var status = await Permission.storage.status;
-  if (!status.isGranted) {
-    await Permission.storage.request();
-  }
-}
+import 'package:geocoding/geocoding.dart';
 
 class DetailOrderPage extends StatelessWidget {
   final String orderId;
@@ -63,7 +56,8 @@ class DetailOrderPage extends StatelessWidget {
             customerData?['detailAlamat'] ?? 'Tidak ada detail alamat',
         'status': orderData['status'] ?? 'Diproses',
         'metodePembayaran': orderData['metodePembayaran'] ?? 'Diproses',
-        'alamatLengkap': customerData?['alamatLengkap'] ?? 'Tidak Diketahui',
+        'alamatLengkap':
+            customerData?['alamatLengkap'] ?? 'Alamat Tidak Diketahui',
         'metodePengambilan': orderData['metodePengambilan'] ??
             'Tidak Diketahui', // Ambil metode pengambilan
         'waktuPembayaran': orderData['waktuPembayaran']?.toString() ?? '0',
@@ -89,177 +83,98 @@ class DetailOrderPage extends StatelessWidget {
     }
   }
 
-  Future<void> savePdf(Map<String, dynamic> orderData) async {
+  Future<void> _bukaGoogleMaps(BuildContext context, String address) async {
     try {
-      final pdf = pw.Document();
-      final formatter = NumberFormat.currency(
-          locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+      List<Location> locations = await locationFromAddress(address);
 
-      pdf.addPage(
-        pw.MultiPage(
-          margin: const pw.EdgeInsets.all(24),
-          build: (pw.Context context) => [
-            pw.Center(
-              child: pw.Text(
-                'DETAIL ORDERAN',
-                style:
-                    pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
-              ),
-            ),
-            pw.SizedBox(height: 20),
-            pw.Divider(),
+      if (locations.isNotEmpty) {
+        final location = locations.first;
+        final googleMapsUrl =
+            'https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}';
 
-            // Section Detail Pelanggan
-            pw.Text('📌 Detail Pelanggan',
-                style:
-                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 8),
-            pw.Bullet(text: 'Nama: ${orderData['customerName']}'),
-            pw.Bullet(text: 'No Handphone: ${orderData['noHandphone']}'),
-            pw.Bullet(text: 'Alamat: ${orderData['address']}'),
-            pw.Bullet(text: 'Alamat Lengkap: ${orderData['detailAlamat']}'),
-            pw.Bullet(
-                text: 'Metode Pengambilan: ${orderData['metodePengambilan']}'),
-            pw.Bullet(
-                text: 'Metode Pembayaran: ${orderData['metodePembayaran']}'),
-            pw.SizedBox(height: 16),
-
-            pw.Divider(),
-
-            // Section Layanan
-            pw.Text('📌 Daftar Layanan',
-                style:
-                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 8),
-            pw.Table.fromTextArray(
-              border: pw.TableBorder.all(color: PdfColors.grey),
-              headers: ['Nama', 'Kategori', 'Harga', 'Jumlah', 'Subtotal'],
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
-              cellAlignment: pw.Alignment.centerLeft,
-              cellStyle: pw.TextStyle(fontSize: 10),
-              data: (orderData['services'] as List<Map<String, dynamic>>)
-                  .map((service) {
-                return [
-                  service['name'] ?? '',
-                  service['kategori'] ?? '',
-                  formatter.format(service['price'] ?? 0),
-                  service['quantity'].toString(),
-                  formatter.format(service['subtotal'] ?? 0),
-                ];
-              }).toList(),
-            ),
-            pw.SizedBox(height: 16),
-
-            pw.Divider(),
-
-            // Section Pembayaran
-            pw.Text('📌 Pembayaran',
-                style:
-                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 8),
-            pw.Bullet(
-                text:
-                    'Total Harga: ${formatter.format(orderData['totalPrice'])}'),
-            pw.Bullet(
-                text:
-                    'Uang Diberikan: ${formatter.format(orderData['uangDiberikan'])}'),
-            pw.Bullet(
-                text: 'Kembalian: ${formatter.format(orderData['kembalian'])}'),
-            pw.Bullet(
-                text: 'Waktu Pembayaran: ${orderData['waktuPembayaran']}'),
-            pw.SizedBox(height: 16),
-
-            pw.Divider(),
-
-            // Section Status Orderan
-            pw.Text('📌 Status Orderan',
-                style:
-                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 8),
-            pw.Bullet(text: 'Status: ${orderData['status']}'),
-            pw.Bullet(
-                text:
-                    'Waktu Order: ${DateFormat('dd-MM-yyyy HH:mm').format(orderData['orderTime'])}'),
-            if (orderData['completedAt'] != null)
-              pw.Bullet(
-                  text:
-                      'Waktu Selesai: ${DateFormat('dd-MM-yyyy HH:mm').format(orderData['completedAt'])}'),
-            if (orderData['pickedUpAt'] != null)
-              pw.Bullet(
-                  text:
-                      'Waktu Diambil: ${DateFormat('dd-MM-yyyy HH:mm').format(orderData['pickedUpAt'])}'),
-            if (orderData['paidAt'] != null)
-              pw.Bullet(
-                  text:
-                      'Waktu Pembayaran: ${DateFormat('dd-MM-yyyy HH:mm').format(orderData['paidAt'])}'),
-          ],
-        ),
-      );
-
-      final directory = await getApplicationDocumentsDirectory();
-      final filePath = '${directory.path}/Order_$orderId.pdf';
-      final file = File(filePath);
-      await file.writeAsBytes(await pdf.save());
-
-      print('✅ PDF berhasil disimpan di: $filePath');
+        if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
+          await launchUrl(Uri.parse(googleMapsUrl),
+              mode: LaunchMode.externalApplication);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tidak dapat membuka Google Maps.')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lokasi tidak ditemukan.')),
+        );
+      }
     } catch (e) {
-      print('Error saving PDF: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
     }
   }
 
-  void sendWhatsAppMessage(Map<String, dynamic> orderData) async {
-    final services = orderData['services'] as List<Map<String, dynamic>>;
-    final totalHarga =
-        services.fold<num>(0, (sum, item) => sum + (item['subtotal'] ?? 0));
+  Future<void> savePdf(Map<String, dynamic> orderData) async {
+    final pdf = pw.Document();
 
-    final formatter =
-        NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            children: [
+              pw.Text('Detail Pelanggan', style: pw.TextStyle(fontSize: 24)),
+              pw.Text('Nama Pelanggan: ${orderData['customerName']}'),
+              pw.Text('No Handphone: ${orderData['no Handphone']}'),
+              pw.Text('Alamat: ${orderData['address']}'),
+              pw.Text('Alamat Lengkap: ${orderData['alamatLengkap']}'),
+              pw.Text('Metode Pengambilan: ${orderData['metodePengambilan']}',
+                  style: pw.TextStyle(fontSize: 16)),
+              pw.Text('Waktu Pembayaran: ${orderData['waktuPembayaran']}'),
+              pw.SizedBox(height: 20),
+              pw.Text('Detail Layanan', style: pw.TextStyle(fontSize: 24)),
+              ...orderData['services'].map<pw.Widget>((service) {
+                return pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text('Nama: ${service['name']}'),
+                    pw.Text('Kategori: ${service['kategori']}'),
+                    pw.Text('Harga: Rp ${service['price']}'),
+                    pw.Text('Jumlah: ${service['quantity']}'),
+                    pw.Text('Subtotal: Rp ${service['subtotal']}'),
+                    pw.SizedBox(height: 10),
+                  ],
+                );
+              }).toList(),
+              pw.SizedBox(height: 20),
+              pw.Text('Metode Pembayaran: ${orderData['metodePembayaran']}'),
+              pw.Text('Status: ${orderData['status']}'),
+              pw.Text(
+                  'Waktu Order: ${DateFormat('dd-MM-yyyy HH:mm').format(orderData['orderTime'])}'),
+              if (orderData['completedAt'] != null)
+                pw.Text(
+                    'Waktu Selesai: ${DateFormat('dd-MM-yyyy HH:mm').format(orderData['completedAt'])}'),
+              if (orderData['pickedUpAt'] != null)
+                pw.Text(
+                    'Waktu Diambil: ${DateFormat('dd-MM-yyyy HH:mm').format(orderData['pickedUpAt'])}'),
+              if (orderData['paidAt'] != null)
+                pw.Text(
+                    'Waktu Pembayaran: ${DateFormat('dd-MM-yyyy HH:mm').format(orderData['paidAt'])}'),
+            ],
+          );
+        },
+      ),
+    );
 
-    String message = '''
-📌 *Detail Pelanggan*  
-Nama: ${orderData['customerName']}  
-No Handphone: ${orderData['noHandphone']}  
-Alamat: ${orderData['address']}  
-Alamat Lengkap: ${orderData['alamatLengkap']}  
-Metode Pengambilan: ${orderData['metodePengambilan']}  
+    final directory = await getApplicationDocumentsDirectory();
+    final filePath = '${directory.path}/order_$orderId.pdf';
 
-📌 *Detail Layanan*  
-${services.map((service) => '   Nama Layanan: ${service['name']}\n'
-            '   Kategori: ${service['kategori']}\n'
-            '   Harga: ${formatter.format(service['price'])}\n'
-            '   Jumlah: ${service['quantity']}\n'
-            '   Subtotal: ${formatter.format(service['subtotal'])}\n').join('\n')}  
+    final file = File(filePath);
+    await file.writeAsBytes(await pdf.save());
 
-📌 *Waktu Pembayaran*  
-${orderData['waktuPembayaran']}
+    print('PDF disimpan di: $filePath');
+  }
 
-📌 *Total Harga*  
-${formatter.format(totalHarga)}  
-
-📌 *Uang Diberikan*  
-${formatter.format(orderData['uangDiberikan'])}  
-
-📌 *Kembalian*  
-${formatter.format(orderData['kembalian'])}  
-
-📌 *Status Order*  
-${orderData['status']}  
-
-📌 *Metode Pembayaran*  
-${orderData['metodePembayaran']}  
-
-📌 *Waktu Order*  
-${DateFormat('dd-MM-yyyy HH:mm').format(orderData['orderTime'])}  
-
-${orderData['completedAt'] != null ? '📌 *Waktu Selesai*  \n' + DateFormat('dd-MM-yyyy HH:mm').format(orderData['completedAt']) + '\n' : ''}  
-${orderData['pickedUpAt'] != null ? '📌 *Waktu Diambil*  \n' + DateFormat('dd-MM-yyyy HH:mm').format(orderData['pickedUpAt']) + '\n' : ''}  
-${orderData['paidAt'] != null ? '📌 *Waktu Pembayaran*  \n' + DateFormat('dd-MM-yyyy HH:mm').format(orderData['paidAt']) + '\n' : ''}
-''';
-
-    final encodedMessage = Uri.encodeComponent(message);
-    final phoneNumber = orderData['noHandphone'].replaceAll(RegExp(r'\D'), '');
-    final url = 'https://wa.me/$phoneNumber?text=$encodedMessage';
+  void sendWhatsAppMessage(String phoneNumber) async {
+    final formattedPhoneNumber = phoneNumber.replaceAll(RegExp(r'\D'), '');
+    final url = 'https://wa.me/$formattedPhoneNumber';
 
     if (await canLaunch(url)) {
       await launch(url);
@@ -273,7 +188,7 @@ ${orderData['paidAt'] != null ? '📌 *Waktu Pembayaran*  \n' + DateFormat('dd-M
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detail Order'),
-        backgroundColor: Colors.blue,
+        backgroundColor: Colors.teal,
       ),
       body: FutureBuilder<Map<String, dynamic>?>(
         future: fetchOrderDetails(),
@@ -365,27 +280,10 @@ ${orderData['paidAt'] != null ? '📌 *Waktu Pembayaran*  \n' + DateFormat('dd-M
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  mainAxisSize: MainAxisSize.min, // Tambahkan ini!
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () async {
-                        await requestStoragePermission(); // Meminta izin
-                        await savePdf(orderData);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('PDF berhasil disimpan'),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.picture_as_pdf),
-                      label: const Text('Download PDF'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                      ),
-                    ),
-                    ElevatedButton.icon(
                       onPressed: () {
-                        sendWhatsAppMessage(orderData);
+                        sendWhatsAppMessage(orderData['noHandphone']);
                       },
                       icon: const Icon(Icons.chat),
                       label: const Text('Kirim WhatsApp'),
@@ -393,8 +291,14 @@ ${orderData['paidAt'] != null ? '📌 *Waktu Pembayaran*  \n' + DateFormat('dd-M
                         backgroundColor: Colors.green,
                       ),
                     ),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.map),
+                      label: const Text("Buka Maps"),
+                      onPressed: () =>
+                          _bukaGoogleMaps(context, orderData['alamatLengkap']),
+                    ),
                   ],
-                )
+                ),
               ],
             ),
           );

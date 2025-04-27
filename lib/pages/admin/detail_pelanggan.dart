@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class DetailPelangganPage extends StatelessWidget {
+class DetailAdminPelangganPage extends StatelessWidget {
   final String namaPelanggan;
   final String noHandphone;
   final String provinsi;
@@ -14,42 +14,37 @@ class DetailPelangganPage extends StatelessWidget {
   final String detailAlamat;
 
   Future<void> _bukaGoogleMaps(BuildContext context) async {
-  final alamatLengkap = '$detailAlamat, $kecamatan, $kota, $provinsi';
+    final alamatLengkap = '$detailAlamat, $kecamatan, $kota, $provinsi';
 
-  try {
-    List<Location> locations = await locationFromAddress(alamatLengkap);
+    try {
+      List<Location> locations = await locationFromAddress(alamatLengkap);
 
-    if (locations.isNotEmpty) {
-      final location = locations.first;
-      final googleMapsUrl =
-          'https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}';
+      if (locations.isNotEmpty) {
+        final location = locations.first;
+        final googleMapsUrl =
+            'https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}';
 
-      final uri = Uri.parse(googleMapsUrl);
-
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.platformDefault, // <-- Ganti ini
-        );
+        if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
+          await launchUrl(Uri.parse(googleMapsUrl),
+              mode: LaunchMode.externalApplication);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tidak dapat membuka Google Maps.')),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tidak dapat membuka Google Maps.')),
+          const SnackBar(content: Text('Lokasi tidak ditemukan.')),
         );
       }
-    } else {
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lokasi tidak ditemukan.')),
+        SnackBar(content: Text('Error: ${e.toString()}')),
       );
     }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error: ${e.toString()}')),
-    );
   }
-}
 
-
-  const DetailPelangganPage({
+  const DetailAdminPelangganPage({
     Key? key,
     required this.namaPelanggan,
     required this.noHandphone,

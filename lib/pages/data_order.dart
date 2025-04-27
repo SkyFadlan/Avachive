@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'dashboard.dart';
 import 'pelanggan.dart';
 import 'buat_order.dart';
@@ -17,7 +18,35 @@ class _DataOrderPageState extends State<DataOrderPage>
     with SingleTickerProviderStateMixin {
   int _selectedIndex = 3;
   late TabController _tabController;
-  DateTime selectedDate = DateTime.now(); // Variabel untuk menyimpan tanggal yang dipilih
+  DateTime selectedDate =
+      DateTime.now(); // Variabel untuk menyimpan tanggal yang dipilih
+
+  // Tambahkan ini ke dalam class
+  String formatCurrency(int amount) {
+    final formatter =
+        NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
+    return formatter.format(amount);
+  }
+
+  String getStatusPembayaran(String waktuPembayaran) {
+    if (waktuPembayaran == "Bayar Sekarang") {
+      return "Sudah Dibayar";
+    } else if (waktuPembayaran == "Bayar Nanti") {
+      return "Belum Lunas";
+    } else {
+      return "-";
+    }
+  }
+
+  Color getPembayaranColor(String waktuPembayaran) {
+    if (waktuPembayaran == "Bayar Sekarang") {
+      return Colors.green;
+    } else if (waktuPembayaran == "Bayar Nanti") {
+      return Colors.red;
+    } else {
+      return Colors.black;
+    }
+  }
 
   @override
   void initState() {
@@ -37,30 +66,23 @@ class _DataOrderPageState extends State<DataOrderPage>
     });
     switch (index) {
       case 0:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const DashboardPage()),
-        );
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (context) => const DashboardPage()));
         break;
       case 1:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const PelangganPage()),
-        );
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (context) => const PelangganPage()));
         break;
       case 2:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const BuatOrderPage()),
-        );
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (context) => const BuatOrderPage()));
+        break;
+      case 3: // Handle Data Order
+        // No action required since you're already on this page.
         break;
       case 4:
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-              builder: (context) =>
-                  const PengaturanPage()), // Navigasi ke halaman Pengaturan
-        );
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (context) => const PengaturanPage()));
         break;
     }
   }
@@ -82,17 +104,18 @@ class _DataOrderPageState extends State<DataOrderPage>
           unselectedLabelColor: Colors.white,
           tabs: const [
             Tab(text: "Diproses"),
-            Tab(text: "Selesai"), // Ubah nama tab
-            Tab(text: "Riwayat"), // Ubah nama tab
+            Tab(text: "Selesai"),
+            Tab(text: "Riwayat"),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildOrderList('Diproses'),
-          _buildOrderList('Sudah Bisa Diambil'), // Ubah status
-          _buildPickupOrders(), // Ganti dengan fungsi baru untuk tab Ambil
+          _buildOrderList('Diproses', true), // Tambahkan tombol selesai
+          _buildOrderList(
+              'Sudah Bisa Diambil', false), // Tambahkan tombol ambil
+          _buildHistoryOrders(), // Ganti dengan fungsi baru untuk tab Riwayat
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -130,14 +153,14 @@ class _DataOrderPageState extends State<DataOrderPage>
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
         iconSize: 20,
-        selectedLabelStyle: TextStyle(fontSize:  12),
+        selectedLabelStyle: TextStyle(fontSize: 12),
         unselectedLabelStyle: TextStyle(fontSize: 12),
         onTap: _onItemTapped,
       ),
     );
   }
 
-  Widget _buildOrderList(String status) {
+  Widget _buildOrderList(String status, bool isDiproses) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('orderan').snapshots(),
       builder: (context, snapshot) {
@@ -147,124 +170,49 @@ class _DataOrderPageState extends State<DataOrderPage>
 
         var orders = snapshot.data!.docs.map((doc) {
           var data = doc.data() as Map<String, dynamic>;
+
+          // Pastikan 'items' adalah List
+          List<dynamic> items = data['items'] ?? [];
+
           return {
             'id': doc.id,
-            'customer': data['customer'] ?? 'Tanpa Nama',
-            'service': data['items'] != null
-                ? (data['items'] as List).map((item) => item['name']).join(', ')
+            'customer': (data['customer'] is Map)
+                ? data['customer']['name'] ?? 'Tanpa Nama'
+                : 'Tanpa Nama',
+            'service': items.isNotEmpty
+                ? items.map((item) => item['name']).join(', ')
                 : 'Tidak ada layanan',
             'date': data['timestamp'] != null
-                ? (data['timestamp'] as Timestamp)
-                    .toDate()
-                    .toString()
-                    .split(' ')[0]
+                ? DateFormat('dd-MM-yyyy')
+                    .format((data['timestamp'] as Timestamp).toDate())
                 : 'Tanggal Tidak Ada',
-            'price': 'Rp ${data['total_price'] ?? 0}',
-            'status': data['status'] ?? 'Diproses',
+            'price': formatCurrency((data['total_price'] ?? 0) as int),
+            'waktuPembayaran': data['waktuPembayaran'] ?? '',
+            'status': data['status']?.toString() ?? 'Diproses',
+            // Ambil status dari item pertama
             'address': data['address'] ?? 'Alamat tidak tersedia',
             'timestamp': data['timestamp'],
           };
         }).toList();
 
-        // Filter berdasarkan status
-        var filteredOrders = orders.where((order) => order['status'] == status).toList();
+        // Filter berdasarkan status dalam items
+        var filteredOrders =
+            orders.where((order) => order['status'] == status).toList();
 
         return ListView.builder(
           padding: const EdgeInsets.all(10),
           itemCount: filteredOrders.length,
           itemBuilder: (context, index) {
             var order = filteredOrders[index];
-            return _buildOrderCard(order, status);
+            return _buildOrderCard(order, status, isDiproses);
           },
         );
       },
     );
   }
 
-  Widget _buildPickupOrders() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: ElevatedButton(
-            onPressed: () async {
-              DateTime? pickedDate = await showDatePicker(
-                context: context,
-                initialDate: selectedDate,
-                firstDate: DateTime(2000),
-                lastDate: DateTime.now(),
-              );
-              if (pickedDate != null) {
-                setState(() {
-                  selectedDate = pickedDate;
-                });
-              }
-            },
-            child: Text("Pilih Tanggal: ${selectedDate.toLocal()}".split(' ')[0]),
-          ),
-        ),
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('orderan').snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              var orders = snapshot.data!.docs.map((doc) {
-                var data = doc.data() as Map<String, dynamic>;
-                return {
-                  'id': doc.id,
-                  'customer': data['customer'] ?? 'Tanpa Nama',
-                  'service': data['items'] != null
-                      ? (data['items'] as List)
-                          .map((item) => item['name'])
-                          .join(', ')
-                      : 'Tidak ada layanan',
-                  'date': data['timestamp'] != null
-                      ? (data['timestamp'] as Timestamp)
-                          .toDate()
-                          .toString()
-                          .split(' ')[0]
-                      : 'Tanggal Tidak Ada',
-                  'price': 'Rp ${data['total_price'] ?? 0}',
-                  'status': data['status'] ?? 'Diproses',
-                  'address': data['address'] ?? 'Alamat tidak tersedia',
-                  'timestamp': data['timestamp'],
-                };
-              }).toList();
-
-              // Filter untuk hanya menampilkan order yang sudah diambil
-              var filteredOrders = orders.where((order) {
-                return order['status'] == 'Sudah Di Ambil' &&
-                       order['date'] == selectedDate.toLocal().toString().split(' ')[0];
-              }).toList();
-
-              int orderCount = filteredOrders.length;
-
-              return Column(
-                children: [
-                  Text("Jumlah Orderan: $orderCount"),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(10),
-                      itemCount: filteredOrders.length,
-                      itemBuilder: (context, index) {
-                        var order = filteredOrders[index];
-                        return _buildOrderCard(order, 'Sudah Di Ambil'); // Ubah status
-                      },
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOrderCard(Map<String, dynamic> order, String status) {
+  Widget _buildOrderCard(
+      Map<String, dynamic> order, String status, bool isDiproses) {
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -277,8 +225,7 @@ class _DataOrderPageState extends State<DataOrderPage>
         );
       },
       child: Card(
-        shape: RoundedRectangleBorder
-        (
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
         ),
         elevation: 3,
@@ -293,7 +240,7 @@ class _DataOrderPageState extends State<DataOrderPage>
                   CircleAvatar(
                     radius: 25,
                     backgroundColor: Colors.grey[300],
-                    child: Icon(Icons.image, color: Colors.blue),
+                    child: Icon(Icons.person, color: Colors.blue),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -321,6 +268,14 @@ class _DataOrderPageState extends State<DataOrderPage>
                         style: const TextStyle(
                             fontSize: 14, fontWeight: FontWeight.bold),
                       ),
+                      Text(
+                        getStatusPembayaran(order['waktuPembayaran']),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: getPembayaranColor(order['waktuPembayaran']),
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         order['status'],
@@ -337,12 +292,31 @@ class _DataOrderPageState extends State<DataOrderPage>
                 ],
               ),
               const SizedBox(height: 8),
-              if (status == 'Sudah Di Ambil')
+              if (isDiproses) // Jika ini adalah tab Diproses
                 ElevatedButton(
                   onPressed: () {
-                    // Aksi jika diperlukan saat order sudah diambil
+                    _updateOrderStatus(order['id'], 'Sudah Bisa Diambil');
                   },
-                  child: const Text("Detail"),
+                  child: const Text("Selesai"),
+                ),
+              if (!isDiproses &&
+                  order['status'] ==
+                      'Sudah Bisa Diambil') // Jika ini adalah tab Selesai
+                ElevatedButton(
+                  onPressed: () {
+                    _updateOrderStatus(order['id'], 'Selesai');
+                  },
+                  child: const Text("Ambil"),
+                ),
+              if (order['waktuPembayaran'] == 'Bayar Nanti')
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                  onPressed: () {
+                    _updateWaktuPembayaran(order['id'], 'Bayar Sekarang');
+                  },
+                  child: const Text("Bayar Sekarang"),
                 ),
             ],
           ),
@@ -351,26 +325,247 @@ class _DataOrderPageState extends State<DataOrderPage>
     );
   }
 
-  // void _updateOrderStatus(String orderId, String newStatus) {
-  //   FirebaseFirestore.instance.collection('orderan').doc(orderId).update({
-  //     'status': newStatus,
-  //   }).then((_) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //           content: Text("Status order berhasil diubah menjadi $newStatus")),
-  //     );
+  void _updateOrderStatus(String orderId, String newStatus) async {
+    try {
+      Map<String, dynamic> updateData = {
+        'status': newStatus,
+      };
 
-  //     // Jika status baru adalah 'Sudah Bisa Diambil', navigasi ke halaman yang sama
-  //     if (newStatus == 'Sudah Bisa Diambil') {
-  //       Navigator.pushReplacement(
-  //         context,
-  //         MaterialPageRoute(builder: (context) => const DataOrderPage()),
-  //       );
-  //     }
-  //   }).catchError((error) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text("Terjadi kesalahan: $error")),
-  //     );
-  //   });
-  // }
+      // Tambahkan waktu saat status diubah
+      if (newStatus == 'Selesai') {
+        updateData['completedAt'] = FieldValue.serverTimestamp();
+      } else if (newStatus == 'Ambil') {
+        updateData['pickedUpAt'] = FieldValue.serverTimestamp();
+      }
+
+      await FirebaseFirestore.instance
+          .collection('orderan')
+          .doc(orderId)
+          .update(updateData);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Order status berhasil diubah menjadi $newStatus')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengubah status order: $e')),
+      );
+    }
+  }
+
+  void _updateWaktuPembayaran(String orderId, String newWaktuPembayaran) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('orderan')
+          .doc(orderId)
+          .update({
+        'waktuPembayaran': newWaktuPembayaran,
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content:
+                Text('Status pembayaran diubah menjadi $newWaktuPembayaran')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengubah status pembayaran: $e')),
+      );
+    }
+  }
+
+  Widget _buildHistoryOrders() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: ElevatedButton(
+            onPressed: () async {
+              DateTime? pickedDate = await showDatePicker(
+                context: context,
+                initialDate: selectedDate,
+                firstDate: DateTime(2000),
+                lastDate: DateTime.now(),
+              );
+              if (pickedDate != null) {
+                setState(() {
+                  selectedDate = pickedDate;
+                });
+              }
+            },
+            child:
+                Text("Pilih Tanggal: ${selectedDate.toLocal()}".split(' ')[0]),
+          ),
+        ),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream:
+                FirebaseFirestore.instance.collection('orderan').snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              var orders = snapshot.data!.docs.map((doc) {
+                var data = doc.data() as Map<String, dynamic>;
+                return {
+                  'id': doc.id,
+                  'customer': (data['customer'] is Map)
+                      ? data['customer']['name'] ?? 'Tanpa Nama'
+                      : 'Tanpa Nama',
+                  'service': data['items'] != null
+                      ? (data['items'] as List)
+                          .map((item) => item['name'])
+                          .join(', ')
+                      : 'Tidak ada layanan',
+                  'date': data['timestamp'] != null
+                      ? (data['timestamp'] as Timestamp)
+                          .toDate()
+                          .toString()
+                          .split(' ')[0]
+                      : 'Tanggal Tidak Ada',
+                  'price': formatCurrency((data['total_price'] ?? 0) as int),
+                  'waktuPembayaran': data['waktuPembayaran'] ?? '',
+                  'status': data['status']?.toString() ?? 'Diproses',
+                  'address': data['address'] ?? 'Alamat tidak tersedia',
+                  'timestamp': data['timestamp'],
+                };
+              }).toList();
+
+              // Filter untuk hanya menampilkan order yang sudah selesai
+              var filteredOrders = orders.where((order) {
+                return order['status'] == 'Selesai' &&
+                    order['date'] ==
+                        selectedDate.toLocal().toString().split(' ')[0];
+              }).toList();
+
+              // Count of completed orders
+              int completedOrderCount = filteredOrders.length;
+
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      'Jumlah Orderan Selesai: $completedOrderCount',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(10),
+                      itemCount: filteredOrders.length,
+                      itemBuilder: (context, index) {
+                        var order = filteredOrders[index];
+                        return _buildHistoryOrderCard(order);
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHistoryOrderCard(Map<String, dynamic> order) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DetailOrderPage(
+              orderId: order['id'],
+            ),
+          ),
+        );
+      },
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        elevation: 3,
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: Colors.grey[300],
+                    child: Icon(Icons.person, color: Colors.blue),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order['customer'],
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          order['date'],
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        order['price'],
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        getStatusPembayaran(order['waktuPembayaran']),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: getPembayaranColor(order['waktuPembayaran']),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        order['status'],
+                        style: TextStyle(
+                          color: Colors.green, // Hijau untuk status selesai
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () {
+                  // Tindakan untuk melihat detail nota
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DetailOrderPage(
+                        orderId: order['id'],
+                      ),
+                    ),
+                  );
+                },
+                child: const Text("Detail Nota"),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

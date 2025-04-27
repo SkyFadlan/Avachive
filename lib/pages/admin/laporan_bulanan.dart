@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dashboard.dart'; // Ganti dengan import halaman Dashboard Admin yang sesuai
-import 'kasir.dart'; // Ganti dengan import halaman Kasir yang sesuai
+import 'karyawan.dart'; // Ganti dengan import halaman Kasir yang sesuai
 import 'layanan.dart'; // Ganti dengan import halaman Layanan yang sesuai
 import 'pengaturan.dart'; // Ganti dengan import halaman Pengaturan yang sesuai
+import 'data_bulanan.dart'; // Import halaman DataBulanPage
+import 'pelanggan.dart';
 
 class LaporanBulananPage extends StatefulWidget {
   const LaporanBulananPage({super.key});
@@ -13,7 +15,23 @@ class LaporanBulananPage extends StatefulWidget {
 }
 
 class _LaporanBulananPageState extends State<LaporanBulananPage> {
-  int _selectedIndex = 3; // Indeks untuk Laporan Bulanan
+  int _selectedIndex = 4; // Indeks untuk Laporan Bulanan
+  int selectedYear = 2025;
+
+  List<String> months = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
 
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return;
@@ -30,9 +48,12 @@ class _LaporanBulananPageState extends State<LaporanBulananPage> {
         nextPage = const LayananPage(); // Halaman Layanan
         break;
       case 3:
+        nextPage = const AdminPelangganPage(); // Halaman Laporan Bulanan
+        break;
+        case 4:
         nextPage = const LaporanBulananPage(); // Halaman Laporan Bulanan
         break;
-      case 4:
+      case 5:
         nextPage = const PengaturanAdminPage(); // Halaman Pengaturan
         break;
       default:
@@ -50,68 +71,131 @@ class _LaporanBulananPageState extends State<LaporanBulananPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Laporan Bulanan', style: TextStyle(color: Colors.white)),
+        title: const Text('Laporan Bulanan',
+            style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blue,
         automaticallyImplyLeading: false,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: StreamBuilder(
-          stream: FirebaseFirestore.instance.collection('orderan').snapshots(),
-          builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return const Center(child: Text('Tidak ada laporan bulan ini.'));
-            }
-
-            var laporanList = snapshot.data!.docs;
-
-            return ListView.builder(
-              itemCount: laporanList.length,
-              itemBuilder: (context, index) {
-                var data = laporanList[index].data() as Map<String, dynamic>;
-
-                return Card(
-                  color: Colors.grey[300],
-                  child: ListTile(
-                    leading: Icon(Icons.receipt, color: Colors.blue),
-                    title: Text(
-                      'Pelanggan: ${data['namaPelanggan'] ?? 'Tidak tersedia'}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+      body: SafeArea(
+        child: Column(
+          children: [
+            SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Text('Tahun :', style: TextStyle(fontSize: 16)),
+                  SizedBox(width: 10),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.grey.shade200,
                     ),
-                    subtitle: Text(
-                      'Total: Rp ${data['totalHarga'] ?? '0'}\nTanggal: ${data['tanggal'] ?? 'Tidak tersedia'}',
+                    child: DropdownButton<int>(
+                      value: selectedYear,
+                      underline: SizedBox(),
+                      items: List.generate(5, (index) {
+                        int year = 2025 - index;
+                        return DropdownMenuItem(
+                          value: year,
+                          child: Text(year.toString()),
+                        );
+                      }),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedYear = value!;
+                        });
+                      },
                     ),
                   ),
-                );
-              },
-            );
-          },
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            Expanded(
+              child: GridView.builder(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 2.5,
+                ),
+                itemCount: months.length,
+                itemBuilder: (context, index) {
+                  return ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade100,
+                      shadowColor: Colors.black12,
+                      elevation: 2,
+                      padding: EdgeInsets.all(12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DataBulanPage(
+                            bulan: index + 1, // Januari = 1, Februari = 2, dst.
+                            tahun: selectedYear,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.insert_chart, color: Colors.grey),
+                        SizedBox(width: 8),
+                        Text(
+                          months[index],
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home, color: _selectedIndex == 0 ? Colors.blue : Colors.grey),
+            icon: Icon(Icons.home,
+                color: _selectedIndex == 0 ? Colors.blue : Colors.grey),
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.people, color: _selectedIndex == 1 ? Colors.blue : Colors.grey),
-            label: 'Kasir',
+            icon: Icon(Icons.people,
+                color: _selectedIndex == 1 ? Colors.blue : Colors.grey),
+            label: 'Karyawan',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.local_laundry_service, color: _selectedIndex == 2 ? Colors.blue : Colors.grey),
+            icon: Icon(Icons.local_laundry_service,
+                color: _selectedIndex == 2 ? Colors.blue : Colors.grey),
             label: 'Layanan',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart, color: _selectedIndex == 3 ? Colors.blue : Colors.grey),
-            label: 'Laporan Bulanan',
+            icon: Icon(Icons.people,
+                color: _selectedIndex == 3 ? Colors.blue : Colors.grey),
+            label: 'Pelanggan',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings, color: _selectedIndex == 4 ? Colors.blue : Colors.grey),
+            icon: Icon(Icons.bar_chart,
+                color: _selectedIndex == 4 ? Colors.blue : Colors.grey),
+            label: 'Data',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings,
+                color: _selectedIndex == 5 ? Colors.blue : Colors.grey),
             label: 'Pengaturan',
           ),
         ],
