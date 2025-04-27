@@ -6,6 +6,7 @@ import 'pelanggan.dart';
 import 'buat_order.dart';
 import 'pengaturan.dart'; // Import halaman Pengaturan
 import 'detail_order.dart'; // Import halaman Detail Order
+import 'pelunasan.dart';
 
 class DataOrderPage extends StatefulWidget {
   const DataOrderPage({super.key});
@@ -212,118 +213,118 @@ class _DataOrderPageState extends State<DataOrderPage>
   }
 
   Widget _buildOrderCard(
-      Map<String, dynamic> order, String status, bool isDiproses) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DetailOrderPage(
-              orderId: order['id'],
-            ),
+    Map<String, dynamic> order, String status, bool isDiproses) {
+  return GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DetailOrderPage(
+            orderId: order['id'],
           ),
-        );
-      },
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
         ),
-        elevation: 3,
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundColor: Colors.grey[300],
-                    child: Icon(Icons.person, color: Colors.blue),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          order['customer'],
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          order['date'],
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+      );
+    },
+    child: Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      elevation: 3,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 25,
+                  backgroundColor: Colors.grey[300],
+                  child: Icon(Icons.person, color: Colors.blue),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        order['price'],
+                        order['customer'],
                         style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        getStatusPembayaran(order['waktuPembayaran']),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: getPembayaranColor(order['waktuPembayaran']),
-                        ),
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        order['status'],
-                        style: TextStyle(
-                          color: order['status'] == 'Diproses'
-                              ? const Color.fromARGB(255, 231, 43, 43) // Merah
-                              : order['status'] == 'Sudah Bisa Diambil'
-                                  ? Colors.blue // Biru
-                                  : Colors.green, // Hijau
-                        ),
+                        order['date'],
+                        style: const TextStyle(color: Colors.grey),
                       ),
                     ],
                   ),
-                ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      order['price'],
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      getStatusPembayaran(order['waktuPembayaran']),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: getPembayaranColor(order['waktuPembayaran']),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      order['status'],
+                      style: TextStyle(
+                        color: order['status'] == 'Diproses'
+                            ? const Color.fromARGB(255, 231, 43, 43) // Merah
+                            : order['status'] == 'Sudah Bisa Diambil'
+                                ? Colors.blue // Biru
+                                : Colors.green, // Hijau
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (isDiproses) // Jika ini adalah tab Diproses
+              ElevatedButton(
+                onPressed: () {
+                  _updateOrderStatus(order['id'], 'Sudah Bisa Diambil');
+                },
+                child: const Text("Selesai"),
               ),
-              const SizedBox(height: 8),
-              if (isDiproses) // Jika ini adalah tab Diproses
-                ElevatedButton(
-                  onPressed: () {
-                    _updateOrderStatus(order['id'], 'Sudah Bisa Diambil');
-                  },
-                  child: const Text("Selesai"),
+            if (!isDiproses &&
+                order['status'] == 'Sudah Bisa Diambil' &&
+                order['waktuPembayaran'] != 'Bayar Nanti') // Tambahkan kondisi ini
+              ElevatedButton(
+                onPressed: () {
+                  _updateOrderStatus(order['id'], 'Selesai');
+                },
+                child: const Text("Ambil"),
+              ),
+            if (order['waktuPembayaran'] == 'Bayar Nanti')
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
                 ),
-              if (!isDiproses &&
-                  order['status'] ==
-                      'Sudah Bisa Diambil') // Jika ini adalah tab Selesai
-                ElevatedButton(
-                  onPressed: () {
-                    _updateOrderStatus(order['id'], 'Selesai');
-                  },
-                  child: const Text("Ambil"),
-                ),
-              if (order['waktuPembayaran'] == 'Bayar Nanti')
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                  ),
-                  onPressed: () {
-                    _updateWaktuPembayaran(order['id'], 'Bayar Sekarang');
-                  },
-                  child: const Text("Bayar Sekarang"),
-                ),
-            ],
-          ),
+                onPressed: () {
+                  _updateWaktuPembayaran(order['id'], 'Bayar Sekarang');
+                },
+                child: const Text("Bayar Sekarang"),
+              ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _updateOrderStatus(String orderId, String newStatus) async {
     try {
